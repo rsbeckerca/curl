@@ -28,6 +28,12 @@
 #define CURL_NO_OLDIES
 #endif
 
+#ifdef __TANDEM
+# if ! defined(__LP64)
+#  include <floss.h>
+# endif
+#endif
+
 /* define mingw version macros, eg __MINGW{32,64}_{MINOR,MAJOR}_VERSION */
 #ifdef __MINGW32__
 #include <_mingw.h>
@@ -158,6 +164,8 @@
 /*  please, do it beyond the point further indicated in this file.  */
 /* ================================================================ */
 
+#include <curl/curl.h>
+
 /*
  * Disable other protocols when http is the only one desired.
  */
@@ -217,7 +225,7 @@
 
 /* ================================================================ */
 /* No system header file shall be included in this file before this */
-/* point.                                                           */
+/* point. The only allowed ones are those included from curl/system.h */
 /* ================================================================ */
 
 /*
@@ -243,8 +251,6 @@
 #ifdef HAVE_WINDOWS_H
 #  include "setup-win32.h"
 #endif
-
-#include <curl/system.h>
 
 /*
  * Use getaddrinfo to resolve the IPv4 address literal. If the current network
@@ -274,41 +280,14 @@
 #endif
 
 #ifdef __AMIGA__
-#  ifdef __amigaos4__
-#    define __USE_INLINE__
-     /* use our own resolver which uses runtime feature detection */
-#    define CURLRES_AMIGA
-     /* getaddrinfo() currently crashes bsdsocket.library, so disable */
-#    undef HAVE_GETADDRINFO
-#    if !(defined(__NEWLIB__) || \
-          (defined(__CLIB2__) && defined(__THREAD_SAFE)))
-       /* disable threaded resolver with clib2 - requires newlib or clib-ts */
-#      undef USE_THREADS_POSIX
-#    endif
-#  endif
 #  include <exec/types.h>
 #  include <exec/execbase.h>
 #  include <proto/exec.h>
 #  include <proto/dos.h>
 #  include <unistd.h>
-#  if defined(HAVE_PROTO_BSDSOCKET_H) && \
-    (!defined(__amigaos4__) || defined(USE_AMISSL))
-     /* use bsdsocket.library directly, instead of libc networking functions */
-#    include <proto/bsdsocket.h>
-#    ifdef __amigaos4__
-       int Curl_amiga_select(int nfds, fd_set *readfds, fd_set *writefds,
-                             fd_set *errorfds, struct timeval *timeout);
-#      define select(a,b,c,d,e) Curl_amiga_select(a,b,c,d,e)
-#    else
-#      define select(a,b,c,d,e) WaitSelect(a,b,c,d,e,0)
-#    endif
-     /* must not use libc's fcntl() on bsdsocket.library sockfds! */
-#    undef HAVE_FCNTL
-#    undef HAVE_FCNTL_O_NONBLOCK
-#  else
-     /* use libc networking and hence close() and fnctl() */
-#    undef HAVE_CLOSESOCKET_CAMEL
-#    undef HAVE_IOCTLSOCKET_CAMEL
+#  ifdef HAVE_PROTO_BSDSOCKET_H
+#    include <proto/bsdsocket.h> /* ensure bsdsocket.library use */
+#    define select(a,b,c,d,e) WaitSelect(a,b,c,d,e,0)
 #  endif
 /*
  * In clib2 arpa/inet.h warns that some prototypes may clash
@@ -320,10 +299,6 @@
 #include <stdio.h>
 #ifdef HAVE_ASSERT_H
 #include <assert.h>
-#endif
-
-#ifdef __TANDEM /* for nsr-tandem-nsk systems */
-#include <floss.h>
 #endif
 
 #ifndef STDC_HEADERS /* no standard C headers! */
@@ -590,6 +565,7 @@
 /* now undef the stock libc functions just to avoid them being used */
 #  undef HAVE_GETADDRINFO
 #  undef HAVE_FREEADDRINFO
+#  undef HAVE_GETHOSTBYNAME
 #elif defined(USE_THREADS_POSIX) || defined(USE_THREADS_WIN32)
 #  define CURLRES_ASYNCH
 #  define CURLRES_THREADED
